@@ -1,0 +1,174 @@
+name: CI
+
+# Guards the two things that broke this repository before: vendored junk getting
+# committed, and secrets getting leaked. Both are cheap to check and catastrophic
+# to miss, so they run on every push and every pull request.
+
+on:
+  push:
+    branches: [main, "arena/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref. A 1 GB repo made CI slow enough that
+# this was previously impossible; now it is just good hygiene.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, needed for the tracked-file audit
+
+      - name: Reject vendored dependency trees
+        run: |
+          set -euo pipefail
+          bad=$(git ls-files | grep -E '(^|/)(venv|node_modules|__pycache__|site-packages|\.venv|env)/' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Vendored dependency trees are tracked in git."
+            echo "These must be installed from requirements.txt / package.json, never committed."
+            echo "$bad" | head -20
+            echo "... $(echo "$bad" | wc -l) files total"
+            echo
+            echo "Fix: git rm -r --cached <path>   (see docs/MIGRATION.md)"
+            exit 1
+          fi
+          echo "OK: no vendored dependency trees tracked."
+
+      - name: Reject binaries, archives and build artifacts
+        run: |
+          set -euo pipefail
+          bad=$(git ls-files | grep -E '\.(exe|dll|so|dylib|pyd|zip|tar\.gz|tgz|7z|rar|msi|dmg|pyc|pyo|class|o|a)$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Platform-specific binaries or archives are tracked in git."
+            echo "$bad" | head -20
+            exit 1
+          fi
+          echo "OK: no binaries or archives tracked."
+
+      - name: Reject committed secrets and databases
+        run: |
+          set -euo pipefail
+          bad=$(git ls-files | grep -E '(^|/)\.env($|\.)|\.env\.(local|production|development)$|\.(db|sqlite|sqlite3)$|\.(pem|key|p12|pfx)$' \
+                | grep -v '\.env\.example$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Environment files, databases or private keys are tracked in git."
+            echo "$bad"
+            echo
+            echo "If a secret was already pushed, ROTATE IT. Removing the file is not enough --"
+            echo "it remains in history, forks, mirrors and caches. See docs/SECURITY.md."
+            exit 1
+          fi
+          echo "OK: no secrets or databases tracked."
+
+      - name: Reject oversized files
+        run: |
+          set -euo pipefail
+          limit=1048576  # 1 MiB -- no legitimate source file in this project needs more
+          bad=$(git ls-files -z | xargs -0 -r du -b 2>/dev/null | awk -v lim="$limit" '$1 > lim {print $1, $2}' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Files larger than 1 MiB are tracked in git:"
+            echo "$bad"
+            echo "Model weights and media belong in releases or an artifact store, not git."
+            exit 1
+          fi
+          echo "OK: no oversized files."
+
+      - name: Report repository footprint
+        run: |
+          files=$(git ls-files | wc -l)
+          echo "Tracked files: $files"
+          echo "Working tree:  $(du -sh --exclude=.git . | cut -f1)"
+          # A regression guard with room to grow: the cleaned repo is 88 files plus
+          # new source. Crossing 2,000 means something vendored crept back in.
+          if [ "$files" -gt 2000 ]; then
+            echo "::error::Tracked file count ($files) exceeds 2000 -- investigate before merging."
+            exit 1
+          fi
+          echo "OK: within expected footprint."
+
+      - name: Require an env template
+        run: |
+          set -euo pipefail
+          test -f .env.example || { echo "::error::.env.example is missing"; exit 1; }
+          echo "OK: .env.example present."
+
+  python-tests:
+    name: AI service + channels (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # Only the light dependencies are installed here on purpose. The analyzer
+      # suite deliberately imports nothing heavy at module scope, so the scoring
+      # engine, SSRF guard, verdict renderer, digital-arrest detector and the
+      # entire WhatsApp channel are all testable without Whisper, OpenCV,
+      # Playwright or spaCy. That keeps CI under a minute instead of ten, which
+      # is the difference between a suite people run and one they skip.
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest httpx fastapi python-dotenv
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Verify every module compiles
+        run: python -m compileall -q ai-service/app channels/whatsapp
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # npm ci requires a lockfile; regenerate it on first CI run if absent.
+      - name: Install
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Build
+        run: npm run build
+
+  backend:
+    name: Backend smoke test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Verify every module parses
+        run: |
+          set -euo pipefail
+          for f in $(git ls-files 'backend/**/*.js' 'backend/*.js'); do
+            node --check "$f" || { echo "::error::$f failed to parse"; exit 1; }
+          done
+          echo "OK: all backend modules parse."

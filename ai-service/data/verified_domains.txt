@@ -1,0 +1,135 @@
+# HAAFIZ verified institutional registry
+# ---------------------------------------------------------------------------
+#
+# This file is the authority on who legitimately owns which domain. It is what
+# separates "hbl.com.pk is HBL" from "hbl-secure-login.xyz is a criminal".
+#
+# Why it matters: every global blocklist (VirusTotal, Google Safe Browsing,
+# PhishTank) is generic. None of them knows Pakistani institutions well, and
+# none of them can tell a genuine HBL subsidiary from an impersonator. This
+# registry is the single highest-leverage data asset in the project -- it is
+# also the part nobody outside Pakistan can replicate. See docs/DETECTION.md.
+#
+# Format
+#   bare-domain           grouped automatically by its second-level label
+#   Brand Name | d1 d2    explicit brand with several official domains
+#   # comment             ignored, anywhere on a line
+#
+# Rules for contributors
+#   1. Only add domains you have verified from the institution's own site,
+#      published annual report, or an official press release. Never add a
+#      domain because it "looks official".
+#   2. Add every TLD the institution actually owns. If Daraz owns daraz.pk but
+#      NOT daraz.com.pk, leave the latter out -- then daraz.com.pk correctly
+#      scores as "needs verification" instead of silently passing.
+#   3. One brand per entry. Do not list Jazz the telco as an alias of JazzCash
+#      the wallet; `validate_registry()` flags that collision.
+#   4. Domains only, no paths. `sc.com/pk` is wrong; `sc.com` is right.
+#
+# Every addition here directly reduces false positives for real users.
+
+# ---------------------------------------------------------------------------
+# Banks
+# ---------------------------------------------------------------------------
+Habib Bank Limited | hbl.com hbl.com.pk habibbank.com
+United Bank Limited | ubl.com ubl.com.pk
+Meezan Bank | meezanbank.com
+Allied Bank | abl.com abl.com.pk alliedbank.com.pk
+Bank Alfalah | bankalfalah.com alfalah.com
+National Bank of Pakistan | nbp.com.pk
+State Bank of Pakistan | sbp.org.pk
+Faysal Bank | faysalbank.com
+Askari Bank | askaribank.com.pk
+Soneri Bank | soneribank.com
+MCB Bank | mcb.com.pk
+Standard Chartered Pakistan | sc.com
+Habib Metropolitan Bank | habibmetro.com
+Summit Bank | thesummitbank.com
+Silkbank | silkbank.com.pk
+BankIslami | bankislami.com.pk
+Al Baraka Bank Pakistan | albaraka.com.pk
+Dubai Islamic Bank Pakistan | dibank.com
+Faysal Islami Bank | faysalbank.com
+Samba Bank | sambabank.com.pk
+JS Bank | jsbank.com
+Bank of Punjab | thebop.com.pk
+Bank of Khyber | bok.com.pk
+Sindh Bank | sindhbank.com.pk
+Punjab Provincial Cooperative Bank | ppcb.com.pk
+Zarai Taraqiati Bank | ztbl.com.pk
+Industrial Development Bank | idbl.com.pk
+First Women's Bank | fwbl.com.pk
+Crescent Commercial Bank | ccbpk.com
+Habib Bank AG Zurich | habibbankagzurich.com
+
+# ---------------------------------------------------------------------------
+# Mobile wallets and fintech
+# ---------------------------------------------------------------------------
+JazzCash | jazzcash.com.pk
+Easypaisa | easypaisa.com.pk easypaisa.digital
+NayaPay | nayapay.com
+SadaPay | sadapay.pk
+Konnect | konnect.com.pk
+HBL Konnect | hblkonnect.com
+Upaisa | upaisa.com.pk
+PayFast | payfast.pk
+Keenu | keenu.com.pk
+
+# ---------------------------------------------------------------------------
+# Telecom operators
+# ---------------------------------------------------------------------------
+Jazz | jazz.com.pk
+Telenor Pakistan | telenor.com.pk
+Zong | zong.com.pk
+Ufone | ufone.com
+Warid Pakistan | waridtel.com
+SCO | sco.com.pk
+PTCL | ptcl.com.pk
+
+# ---------------------------------------------------------------------------
+# Government and regulators
+#   Impersonation of these is the single most common scam pattern in Pakistan:
+#   fake NADRA/FIA/SBP notices demanding CNIC, OTP or "verification fees".
+# ---------------------------------------------------------------------------
+NADRA | nadra.gov.pk pak-identity.com
+Federal Investigation Agency | fia.gov.pk
+Pakistan Telecommunication Authority | pta.gov.pk
+Federal Board of Revenue | fbr.gov.pk
+Securities and Exchange Commission of Pakistan | secp.gov.pk
+Pakistan Post | pakpost.gov.pk
+Passport Office Pakistan | passport.gov.pk
+Citizen Portal | pakistancitizenportal.gov.pk
+Benazir Income Support Programme | bisp.gov.pk
+Ehsaas Programme | ehsaas.gov.pk
+National Savings | nationalsavings.gov.pk
+Pakistan Bureau of Statistics | pbs.gov.pk
+Election Commission of Pakistan | ecp.gov.pk
+
+# ---------------------------------------------------------------------------
+# Marketplaces, delivery and ride-hailing
+#   These are impersonated constantly for "delivery fee" and "prize" scams.
+# ---------------------------------------------------------------------------
+Daraz | daraz.pk
+OLX Pakistan | olx.com.pk
+Foodpanda Pakistan | foodpanda.pk
+Careem | careem.com
+Bykea | bykea.com
+Lamudi Pakistan | lamudi.pk
+Telemart | telemart.pk
+
+# ---------------------------------------------------------------------------
+# Stock exchange and financial infrastructure
+# ---------------------------------------------------------------------------
+Pakistan Stock Exchange | psx.com.pk
+1LINK | 1link.net.pk
+NIFT | nift.com.pk
+
+# ---------------------------------------------------------------------------
+# News organisations
+#   Frequently spoofed to lend fake investment and prize scams credibility.
+# ---------------------------------------------------------------------------
+Dawn | dawn.com
+Geo News | geo.tv
+ARY News | arynews.tv
+Express Tribune | tribune.com.pk
+The News International | thenews.com.pk
