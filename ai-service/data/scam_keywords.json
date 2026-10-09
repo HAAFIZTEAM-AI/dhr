@@ -1,0 +1,56 @@
+{
+  "roman_urdu": {
+    "urgency": ["foran", "abhi", "fatafat", "jaldi", "aaj hi", "last chance", "kal tak", "fori", "foran karein", "turant"],
+    "authority": ["FIA", "State Bank", "NADRA", "PTA", "FBR", "JazzCash agent", "EasyPaisa agent", "bank manager", "govt officer", "cyber crime"],
+    "financial": ["fee", "deposit", "payment", "paisay bhejo", "bank transfer", "jama karwain", "hundi", "advance"],
+    "otp": ["OTP", "CNIC", "OTP bataein", "code bhejo", "verify karein", "pin bataein", "password bataein", "CNIC bataein", "number bataein"],
+    "threat": ["account band", "suspend", "block", "band hone wala", "muattal", "terminate", "closed", "legal action"],
+    "reward": ["inaam", "jeet", "lottery", "lucky draw", "free gift", "winner", "cash prize", "selected hain"],
+    "investment": ["bitcoin", "crypto", "investment", "double paisa", "guaranteed profit", "forex", "trading", "return"]
+  },
+  "english": {
+    "urgency": ["urgent", "immediate", "now", "today", "last chance", "hurry up", "asap", "expires today"],
+    "authority": ["FIA", "State Bank", "NADRA", "PTA", "FBR", "bank manager", "government official", "verification officer", "customs"],
+    "financial": ["deposit", "fee", "payment", "send money", "bank transfer", "wire money", "processing fee", "tax payment", "unpaid", "overdue", "outstanding balance", "make a payment", "pay now"],
+    "otp": ["OTP", "CNIC", "verification code", "PIN", "password", "security code", "CNIC number", "card number", "CVV"],
+    "threat": ["account suspended", "blocked", "terminated", "restricted", "will be closed", "legal action", "arrest warrant"],
+    "reward": ["prize", "winner", "lottery", "lucky", "free gift", "congratulations", "selected", "claim your prize"],
+    "investment": ["bitcoin", "crypto", "investment", "double your money", "guaranteed returns", "forex", "trading"]
+  },
+  "urdu": {
+    "urgency": ["فوری", "ابھی", "جلدی", "آج ہی", "آخری موقع", "فوراً"],
+    "authority": ["ایف آئی اے", "اسٹیٹ بینک", "نادرا", "پی ٹی اے", "جاز کیش ایجنٹ", "ایزی پیسہ ایجنٹ", "بینک مینیجر"],
+    "financial": ["فیس", "ڈپازٹ", "ادائیگی", "پیسے بھیجو", "بینک ٹرانسفر", "جمع کروائیں"],
+    "otp": ["او ٹی پی", "او ٹی پی بتائیں", "کوڈ بھیجو", "تصدیق کریں", "پن بتائیں", "پاس ورڈ بتائیں"],
+    "threat": ["اکاؤنٹ بند", "معطل", "بلاک", "بند ہونے والا", "ختم", "قانونی کارروائی"],
+    "reward": ["انعام", "جیت", "لاٹری", "لکی ڈرا", "مفت تحفہ", "فاتح"],
+    "investment": ["بٹ کوائن", "کریپٹو", "انویسٹمنٹ", "دگنے پیسے", "گارنٹیڈ منافع"]
+  },
+  "sindhi": {
+    "urgency": ["فوري", "هينئر", "جلدي", "اڄ"],
+    "authority": ["ايف آءِ اي", "اسٽيٽ بينڪ", "نادرا"],
+    "financial": ["فيص", "ڊپازٽ", "ادائگي"],
+    "otp": ["او ٽي پي", "ڪوڊ", "پن"],
+    "threat": ["بند", "معطل", "بلآڪ"],
+    "reward": ["انعام", "لاٽري"],
+    "investment": ["بٽ ڪوائن", "ڪريپٽو"]
+  },
+  "punjabi": {
+    "urgency": ["فوری", "ہن", "جلدی", "اج"],
+    "authority": ["ایف آئی اے", "سٹیٹ بینک", "نادرا"],
+    "financial": ["فیس", "ڈپازٹ", "ادائیگی"],
+    "otp": ["او ٹی پی", "کوڈ", "پن"],
+    "threat": ["بند", "معطل", "بلاک"],
+    "reward": ["انعام", "لاٹری"],
+    "investment": ["بٹ کوائن", "کریپٹو"]
+  },
+  "balochi": {
+    "urgency": ["فوری", "اَڄ", "تۏک"],
+    "authority": ["ایف آی اے", "اسٹیٹ بینک"],
+    "financial": ["فیص", "ڈپازٹ"],
+    "otp": ["او ٹی پی", "کوڈ"],
+    "threat": ["بند", "معطل"],
+    "reward": ["انعام"],
+    "investment": ["بٹ کوائن"]
+  }
+}

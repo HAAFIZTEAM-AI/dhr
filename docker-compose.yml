@@ -1,0 +1,135 @@
+# ===========================================================================
+# HAAFIZ — local and single-host deployment
+#
+#   cp .env.example .env      # fill in JWT_SECRET and the WhatsApp credentials
+#   docker compose up
+#
+# Binds to 0.0.0.0 so it works behind a reverse proxy, in a container sandbox,
+# and in preview environments — not only on a developer's own machine. The
+# previous deployment story was a Windows-only .bat file that opened three cmd
+# windows, which excluded Linux, macOS, CI and every cloud target.
+# ===========================================================================
+
+name: haafiz
+
+services:
+  ai-service:
+    build: ./ai-service
+    container_name: haafiz-ai
+    restart: unless-stopped
+    environment:
+      AI_PORT: "5001"
+      # Named origins only. The previous "*" together with allow_credentials=True
+      # is invalid per the CORS spec and is rejected by browsers.
+      AI_CORS_ORIGINS: ${AI_CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}
+      WHISPER_MODEL: ${WHISPER_MODEL:-tiny}
+      MODEL_PATH: /srv/haafiz/models/scam_detector.pkl
+      # Keep the SSRF guard strict. Flipping this on in production would let
+      # anyone reach the cloud metadata endpoint through the website analyzer.
+      HAAFIZ_ALLOW_PRIVATE_NETWORKS: "0"
+    volumes:
+      # Model weights are large and change independently of the code, so they are
+      # a volume rather than an image layer.
+      - ai-models:/srv/haafiz/models
+    ports:
+      - "${AI_PORT:-5001}:5001"
+    networks: [haafiz]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  backend:
+    build: ./backend
+    container_name: haafiz-backend
+    restart: unless-stopped
+    depends_on:
+      ai-service:
+        condition: service_healthy
+    environment:
+      PORT: "3001"
+      NODE_ENV: ${NODE_ENV:-production}
+      # REQUIRED — no default is provided on purpose. An empty JWT_SECRET lets
+      # anyone forge a session token, so the service must refuse to start.
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required -- generate one with openssl rand -hex 64}"
+      JWT_EXPIRE: ${JWT_EXPIRE:-7d}
+      DB_PATH: /srv/haafiz/data/haafiz.db
+      AI_SERVICE_URL: http://ai-service:5001
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-900000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-20}
+      INTERNAL_API_TOKEN: "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN is required for Family Shield escalation}"
+    volumes:
+      # The database lives here, never in the image or in git. A committed
+      # haafiz.db previously exposed a user's email and password hash publicly.
+      - haafiz-data:/srv/haafiz/data
+    ports:
+      - "${PORT:-3001}:3001"
+    networks: [haafiz]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # nginx proxies /api to the backend, so the browser only ever talks to
+        # one origin and CORS is not needed at all in this deployment.
+        VITE_API_URL: /api
+        VITE_AI_URL: ""
+    container_name: haafiz-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    networks: [haafiz]
+
+  # -----------------------------------------------------------------------
+  # The primary delivery channel. See docs/BLUEPRINT.md §4.1 — this is how
+  # HAAFIZ reaches people who will never open a website.
+  #
+  # Optional: `docker compose up ai-service backend frontend` omits it, so a
+  # deployment without WhatsApp credentials still works.
+  # -----------------------------------------------------------------------
+  whatsapp:
+    build:
+      context: ./channels/whatsapp
+    container_name: haafiz-whatsapp
+    restart: unless-stopped
+    profiles: ["channels"] # opt-in: `docker compose --profile channels up`
+    depends_on:
+      - backend
+      - ai-service
+    environment:
+      WHATSAPP_PORT: "5002"
+      # All four are required. A missing app secret must fail closed — an
+      # unsigned public webhook lets anyone forge messages and inject fake
+      # Family Shield alerts.
+      WHATSAPP_APP_SECRET: "${WHATSAPP_APP_SECRET:?WHATSAPP_APP_SECRET is required}"
+      WHATSAPP_VERIFY_TOKEN: "${WHATSAPP_VERIFY_TOKEN:?WHATSAPP_VERIFY_TOKEN is required}"
+      WHATSAPP_PHONE_NUMBER_ID: "${WHATSAPP_PHONE_NUMBER_ID:?WHATSAPP_PHONE_NUMBER_ID is required}"
+      # Must be a PERMANENT system-user token. The 24-hour test token silently
+      # breaks in production.
+      WHATSAPP_ACCESS_TOKEN: "${WHATSAPP_ACCESS_TOKEN:?WHATSAPP_ACCESS_TOKEN is required}"
+      AI_SERVICE_URL: http://ai-service:5001
+      BACKEND_URL: http://backend:3001
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+    ports:
+      - "${WHATSAPP_PORT:-5002}:5002"
+    networks: [haafiz]
+
+networks:
+  haafiz:
+    driver: bridge
+
+volumes:
+  haafiz-data:
+  ai-models:

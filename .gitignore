@@ -1,0 +1,127 @@
+# ---------------------------------------------------------------------------
+# HAAFIZ .gitignore
+#
+# HISTORY: this repo previously tracked 30,151 vendored files (venv/,
+# node_modules/, .exe installers, .dll, a 51 MB zip, .pyc caches) plus a live
+# backend/.env containing the JWT secret and backend/haafiz.db containing a
+# user's email and password hash. The old .gitignore already listed most of
+# these patterns -- but listing a pattern does nothing for a file that is
+# ALREADY tracked. That is why 1 GB of junk survived a .gitignore that named it.
+#
+# Rule: adding a pattern here is not enough on its own. Anything already
+# committed must also be removed from the index:
+#     git rm -r --cached <path>
+# See docs/MIGRATION.md.
+# ---------------------------------------------------------------------------
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+.venv*/
+*venv*/
+env/
+ENV/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm/
+.yarn/
+
+# --- Build output ---
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# --- Secrets and environment --------------------------------------------
+# NEVER commit these. Use .env.example as the template.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+credentials.json
+
+# --- Databases and user data ---------------------------------------------
+# Contains password hashes and personal data. Never commit.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+
+# --- Trained model artifacts ---------------------------------------------
+# Large binaries; distributed via releases or a model registry, not git.
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.h5
+models/
+!ai-service/models/.gitkeep
+# Whisper downloads models to a cache on first use.
+.cache/
+whisper/
+
+# --- Media and uploads ----------------------------------------------------
+uploads/
+tmp/
+temp/
+*.wav
+*.mp3
+*.ogg
+*.webm
+
+# --- OS and editor cruft ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Installers and archives ---------------------------------------------
+# These were committed before and bloated .git to 336 MB. They belong in a
+# release asset or a package manager, never in version control.
+*.exe
+*.msi
+*.dmg
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.dll
+*.so
+*.dylib
+*.pyd
+
+# --- Logs ---
+logs/
+*.log

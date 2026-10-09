@@ -1,0 +1,20 @@
+# HAAFIZ WhatsApp channel
+#
+# Pinned to minor versions. This service terminates a publicly reachable webhook
+# and talks to real users who may be about to lose money, so a surprise
+# dependency change is a production incident rather than an inconvenience.
+#
+# Note what is deliberately ABSENT: no Whisper, no OpenCV, no Playwright, no
+# spaCy. Analysis happens in ai-service. Keeping this transport light is what
+# lets it reply within Meta's webhook timeout instead of being starved by a
+# transcription running in the same process.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+pydantic==2.10.4
+python-dotenv==1.0.1
+
+# Test-only. Kept here rather than in a separate file because this package is
+# small; split it out if the channel grows.
+pytest==8.3.4
