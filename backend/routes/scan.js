@@ -34,8 +34,26 @@ router.post('/analyze', authenticate, async (req, res) => {
       moduleResults.phone = aiRes.data;
     }
 
+    // Noisy-OR combination. Must stay in sync with haafiz/scoring/engine.py,
+    // which is the authoritative implementation -- if the two drift, the API
+    // and the WhatsApp channel will disagree about the same message.
+    //
+    // The previous line was a plain arithmetic mean:
+    //     scores.reduce((a,b) => a+b, 0) / scores.length
+    // and it was actively dangerous. One module reporting 95 plus four
+    // reporting 0 averages to 19, which the `>= 60` test below then called
+    // NOT a scam. A text-only scam message -- the common case, since most
+    // reports are an SMS or a WhatsApp forward -- was diluted into safety by
+    // the four analyzers that had nothing to look at.
+    //
+    // 1 - product(1 - p) asks the right question instead: what is the chance
+    // that AT LEAST ONE analyzer is correct? For 95 and four zeros that is 95.
     const scores = Object.values(moduleResults).map(r => r.confidence || 0);
-    const avgConfidence = scores.length ? Math.round(scores.reduce((a,b) => a+b, 0) / scores.length) : 0;
+    const complement = scores.reduce(
+      (acc, s) => acc * (1 - Math.min(Math.max(s, 0), 100) / 100),
+      1
+    );
+    const avgConfidence = scores.length ? Math.round((1 - complement) * 100) : 0;
     const isScam = avgConfidence >= 60;
     const riskFactors = Object.values(moduleResults).flatMap(r => r.risk_factors || []);
     const explanation = isScam

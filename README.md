@@ -83,11 +83,47 @@ Poora plan: **[`docs/BLUEPRINT.md`](docs/BLUEPRINT.md)**
 | Analyzer | Kya karta hai |
 |---|---|
 | `text` | 6 zubaanon ke keyword sets + CNIC/phone patterns + shakkī TLDs |
-| `website` | DNS, WHOIS domain age, SSL, typosquatting, Playwright crawl |
+| `website` | SSRF guard, DNS, WHOIS domain age, SSL, **brand impersonation (74 institutions)**, Playwright crawl |
 | `voice` | Whisper transcription → text analysis + tone |
 | `phone` | Reputation registry + pattern analysis |
 | `image` | OCR (pytesseract) → text analysis |
 | **`digital_arrest`** | **نیا** — fake FIA/NCCIA arrest coercion signature |
+
+### Detection: blocklist se aage
+
+VirusTotal par ek shakkī URL daaliye aur wo `0/94 clean` kehta hai. Ye bug nahi,
+us ka design hai — VirusTotal detector nahi, **aggregator** hai. Wo 70+ engines
+se poochta hai, aur wo engines khud blocklists check karte hain. `0/94` ka matlab
+"safe" nahi, **"abhi tak kisi ne report nahi ki"** hota hai. Nayi phishing site
+kisi list par hoti hi nahi.
+
+HAAFIZ do layers chalata hai:
+
+```
+Layer 1 — REACTIVE   jo duniya jaan chuki hai
+  Safe Browsing · PhishTank · OpenPhish · URLhaus · apni registry
+  (koi ek source ka timeout verdict ko dilute nahi karta)
+
+Layer 2 — PROACTIVE  jo abhi kisi ne nahi dekha     ← asli farq yahan hai
+  brand impersonation · Certificate Transparency · URL heuristics
+```
+
+Layer 2 **offline, instant aur zero-quota** hai. Ye paanch techniques chalata hai:
+
+| Technique | Misal | Kaise |
+|---|---|---|
+| separator substitution | `hbl-com.pk` | normalized form verified registry se collide karta hai |
+| homoglyph / IDN | `xn--80ak6aa92e.com` | punycode decode → Cyrillic `аррӏе` → `apple` |
+| keyword stuffing | `secure-hbl-login.com` | brand + {login, verify, secure, kyc, otp…} |
+| subdomain abuse | `hbl-login.attacker.com` | brand kisi gair-malikaana domain ke neeche |
+| TLD variation | `hbl.co` | brand ka bilkul sahi naam, ghalat TLD par |
+
+Natija: **`secure-hbl-login.com` → 90% malicious**, bina kisi blocklist ke,
+bina kisi API key ke, milliseconds mein. Aur `hblstocks.com` (asli subsidiary)
+clean rehta hai — false positive trust ko miss se zyada todta hai.
+
+Dekhein: [`docs/DETECTION.md`](docs/DETECTION.md) ·
+[`ai-service/haafiz/intel/domain_similarity.py`](ai-service/haafiz/intel/domain_similarity.py)
 
 ### Scoring: noisy-OR, na ke average
 
@@ -105,7 +141,7 @@ Khamosh module *safety ka saboot* nahi — wo *saboot ki ghair-maujoodgi* hai.
 
 $$P(\text{scam}) = 1 - \prod_i (1 - w_i \cdot p_i)$$
 
-Dekhein: [`ai-service/app/scoring/engine.py`](ai-service/app/scoring/engine.py)
+Dekhein: [`ai-service/haafiz/scoring/engine.py`](ai-service/haafiz/scoring/engine.py)
 
 ---
 
@@ -126,7 +162,12 @@ Ya manually:
 cd ai-service
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 5001
+uvicorn app:app --host 0.0.0.0 --port 5001
+#  ^ `app:app`, NAKE `app.main:app` aur naake koi `app/` directory.
+#    ai-service/app.py FastAPI entrypoint hai. Usi folder mein `app/` naam ka
+#    package banane se wo shadow ho jata hai -- Python package ko module par
+#    tarjeeh deta hai -- aur server import hi nahi hota. Naya code
+#    ai-service/haafiz/ mein jata hai.
 
 # 2. Backend (port 3001)
 cd backend && npm ci && npm run dev
@@ -157,16 +198,22 @@ pytest
 
 ```
 ai-service/         FastAPI — analyzers, scoring engine, verdict renderer
-  app/core/           SSRF guard, config
-  app/scoring/        noisy-OR ensemble
-  app/verdict/        plain-language rendering, 7 languages
-  app/analyzers/      text, website, voice, phone, image, digital_arrest
+  app.py              entrypoint  (uvicorn app:app — `app/` dir MAT banaiye)
+  haafiz/core/        SSRF guard
+  haafiz/intel/       brand impersonation + federated threat intelligence
+  haafiz/scoring/     noisy-OR ensemble
+  haafiz/verdict/     plain-language rendering, 7 languages
+  haafiz/analyzers/   digital_arrest
+  analyzers/          text, website, voice, phone, image
+  data/               verified_domains.txt — 74 Pakistani institutions
   tests/
 backend/            Express + SQLite — auth, family, gamification, history
 frontend/           React + Vite + Tailwind — PWA, i18n, Leaflet heatmap
 channels/
   whatsapp/         Cloud API webhook — the zero-friction front door
 docs/
+  DETECTION.md      ← VirusTotal kyun ghalat kehta hai, aur HAAFIZ ka jawab
+  PLATFORMS.md      ← laptop / Android / iOS / feature phone: kya mumkin hai
   BLUEPRINT.md      ← poori strategy: research, channels, 90-din ka plan
   SECURITY.md       ← leaked-secret incident aur remediation
   MIGRATION.md      ← 30,151 vendored files kaise hataye gaye
@@ -196,11 +243,19 @@ Naye vulnerabilities report karne ke liye bhi wahi file dekhein.
 - [x] Digital-arrest detector
 - [x] Plain-language verdict renderer — 7 zubaanein + spoken output
 - [x] WhatsApp channel foundation (signature, dedupe, inbound, language)
+- [x] Verified institutional registry — 74 banks/telcos/regulators/marketplaces
+- [x] Brand-impersonation detector — zero-hour, offline, 5 techniques
+- [x] Federated threat intelligence — parallel sources, fail-open combination
+- [x] Cross-platform research — [`docs/PLATFORMS.md`](docs/PLATFORMS.md)
+- [ ] Vendor adapters: Safe Browsing, PhishTank, OpenPhish, URLhaus feeds
+- [ ] Certificate Transparency monitor (phishing ko *ban'te hue* pakarna)
+- [ ] Browser extension (Manifest V3) — click se pehle interception
+- [ ] Android app — `CallScreeningService` + Share target
+- [ ] iOS app — Call Directory + Share Extension + Safari Web Extension
 - [ ] WhatsApp channel: live Cloud API integration + closed beta
 - [ ] Trained ML model (Zenodo Roman Urdu SMS dataset, DOI `10.5281/zenodo.21810885`)
 - [ ] Family Shield: multi-group, severity, acknowledgement
 - [ ] Evidence-bundle generator (NCCIA / PTA 9000)
-- [ ] Verified institutional registry (banks, telcos, government)
 - [ ] IVR voice helpline
 - [ ] Cyber Mohalla ambassador programme
 
@@ -216,9 +271,15 @@ Is project ka maqsad ek public good hai. Permissive license is liye chuna gaya k
 
 ## Research aur sources
 
-Poora data with citations: **[`docs/BLUEPRINT.md`](docs/BLUEPRINT.md#sources)**
+Poora data with citations:
 
-NCCIA / Ministry of Interior parliamentary data · GSMA *Unlocking Pakistan's Digital Potential* · PTA · Kaspersky · Internet Society · LUMS (Mehfil, Polly IVR studies) · Zenodo Roman Urdu phishing corpus
+| Document | Kya cover karta hai |
+|---|---|
+| [`docs/DETECTION.md`](docs/DETECTION.md#sources) | blocklist limitations, VirusTotal/Safe Browsing/PhishTank/URLhaus, Certificate Transparency, ML literature |
+| [`docs/PLATFORMS.md`](docs/PLATFORMS.md#sources) | Apple CallKit/Safari extensions, Android CallScreeningService/NotificationListener/Play policy, MV3 |
+| [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md#sources) | Pakistan cybercrime data, PTA/NCCIA channels, GSMA connectivity, IVR studies, competitive gap |
+
+NCCIA / Ministry of Interior parliamentary data · GSMA *Unlocking Pakistan's Digital Potential* · PTA · Kaspersky · Internet Society · LUMS (Mehfil, Polly IVR studies) · Zenodo Roman Urdu phishing corpus · *Nature Scientific Reports* · PMC · MDPI · Apple Developer · Android Developers · Google Play policy
 
 ---
 

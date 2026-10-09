@@ -526,7 +526,7 @@ P(scam) = 1 − Π(1 − wᵢ·pᵢ)          # any strong signal dominates
   − trust discount:  domain on verified registry → strong suppression
 ```
 
-See `ai-service/app/scoring/engine.py` for the implementation.
+See `ai-service/haafiz/scoring/engine.py` for the implementation.
 
 ### 6.4 Kill the fake numbers
 

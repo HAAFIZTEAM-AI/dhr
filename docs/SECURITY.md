@@ -93,7 +93,7 @@ POST /analyze/website
 The first returns cloud IAM credentials. The others turn HAAFIZ into an
 authenticated proxy into internal networks.
 
-**Fix:** `ai-service/app/core/ssrf.py` — resolves the hostname *before* any
+**Fix:** `ai-service/haafiz/core/ssrf.py` — resolves the hostname *before* any
 connection and rejects anything that is not publicly routable: loopback,
 link-local (incl. `169.254.169.254`), RFC1918, CGNAT (`100.64.0.0/10`, heavily
 used by Pakistani ISPs), multicast, reserved, unspecified, IPv4-mapped IPv6,

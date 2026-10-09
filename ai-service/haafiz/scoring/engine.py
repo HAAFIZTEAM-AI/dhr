@@ -274,7 +274,7 @@ class Verdict:
 
     ``confidence`` is intentionally kept as an integer percentage for API
     compatibility with the existing frontend, but the frontend should render
-    ``label`` and the localized advice from :mod:`app.verdict.render` — a bare
+    ``label`` and the localized advice from :mod:`haafiz.verdict.render` — a bare
     percentage is not actionable for the audience this product serves.
     """
 

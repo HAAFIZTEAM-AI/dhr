@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.scoring.engine import (
+from haafiz.scoring.engine import (
     CRITICAL_THRESHOLD,
     SCAM_THRESHOLD,
     ModuleScore,

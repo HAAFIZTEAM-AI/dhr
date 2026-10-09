@@ -161,7 +161,7 @@ class DigitalArrestResult:
         authority_claimed: which institution the message claims to be from.
         is_digital_arrest: True when the coercion signature is met.
         overrides: feeds straight into
-            :func:`app.scoring.engine.combine_scores`.
+            :func:`haafiz.scoring.engine.combine_scores`.
     """
 
     confidence: int

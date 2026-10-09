@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import os
 import ssl
 import socket
 import whois
@@ -11,6 +12,41 @@ from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import re
 
+from haafiz.core.ssrf import SSRFError, assert_public_url
+from haafiz.intel.domain_similarity import (
+    BrandImpersonationDetector,
+    load_brands_from_file,
+)
+
+# The verified institutional registry: every Pakistani bank, telco, wallet,
+# regulator and marketplace whose official domains we have confirmed. This
+# replaces a hardcoded nine-domain subset, which could not tell a genuine HBL
+# subsidiary from an impersonator. Overridable for tests and for deployments
+# that ship a curated private list. See docs/DETECTION.md.
+_REGISTRY_PATH = os.environ.get(
+    "HAAFIZ_VERIFIED_DOMAINS",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                 "data", "verified_domains.txt"),
+)
+
+_detector = None
+
+
+def get_detector():
+    """Lazily build and cache the brand detector.
+
+    Loading at import time would make the whole AI service fail to boot when
+    the data file is missing, and the website analyzer is only one of several
+    endpoints. A missing registry degrades to "no brand signal" instead.
+    """
+    global _detector
+    if _detector is None:
+        brands = load_brands_from_file(_REGISTRY_PATH)
+        for problem in BrandImpersonationDetector(brands).validate_registry():
+            print(f"[website_analyzer] registry problem: {problem}")
+        _detector = BrandImpersonationDetector(brands)
+    return _detector
+
 async def analyze_website(url):
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
@@ -21,6 +57,32 @@ async def analyze_website(url):
     
     findings = []
     url_risk = 0
+
+    # 0. SSRF guard -- BEFORE any network access.
+    #
+    # Everything below resolves and connects to a hostname supplied by an
+    # unauthenticated caller. Without this guard the analyzer is an open proxy
+    # into the host network: submit http://169.254.169.254/ and the cloud
+    # metadata service answers; submit http://localhost:6379/ and it reaches
+    # whatever is listening on the loopback. assert_public_url resolves the
+    # name itself and rejects private, loopback, link-local and reserved
+    # ranges, so DNS rebinding onto an internal address is caught too.
+    try:
+        assert_public_url(url)
+    except SSRFError as exc:
+        findings.append({
+            "type": "ssrf",
+            "detail": f"URL internal/private network ki taraf ishara karta hai: {exc}",
+            "severity": "critical",
+        })
+        return {
+            "risk_score": 100,
+            "is_safe": False,
+            "verdict": "BLOCKED",
+            "findings": findings,
+            "url": url,
+            "domain": domain,
+        }
 
     # 1. DNS resolution - check this FIRST. A domain that doesn't resolve at
     # all doesn't exist / isn't routable, which is a strong standalone
@@ -70,23 +132,42 @@ async def analyze_website(url):
                     # Check self-signed (basic)
                     if not cert.get('issuer'):
                         ssl_valid = False
-        except:
-            pass
+        except (ssl.SSLError, ssl.CertificateError, socket.timeout,
+                socket.gaierror, OSError) as exc:
+            # A bare `except:` here swallowed KeyboardInterrupt and SystemExit
+            # as well as the real error, and discarded the reason entirely, so
+            # a certificate problem and a dead network looked identical.
+            ssl_error = f"{type(exc).__name__}: {exc}"
         if not ssl_valid:
             url_risk += 20
-            findings.append({"type": "ssl", "detail": "Invalid or missing SSL certificate", "severity": "medium"})
+            detail = "Invalid or missing SSL certificate"
+            if locals().get("ssl_error"):
+                detail = f"{detail} ({ssl_error})"
+            findings.append({"type": "ssl", "detail": detail, "severity": "medium"})
     else:
         findings.append({"type": "ssl", "detail": "SSL check skipped - domain does not resolve", "severity": "low"})
     
-    # 4. Typosquatting check against known Pakistani domains
-    known_domains = ['hbl.com', 'ubl.com.pk', 'meezanbank.com', 'jazzcash.com.pk', 'easypaisa.com.pk',
-                     'alliedbank.com.pk', 'alfalah.com', 'nbp.com.pk', 'statebank.com.pk']
-    for known in known_domains:
-        # Simple Levenshtein distance
-        if levenshtein(registered_domain, known) <= 2 and registered_domain != known:
-            url_risk += 30
-            findings.append({"type": "typosquatting", "detail": f"Domain resembles {known}", "severity": "critical"})
-            break
+    # 4. Brand impersonation -- see haafiz/intel/domain_similarity.py
+    #
+    # The previous check was `levenshtein(registered_domain, known) <= 2` over
+    # nine hardcoded domains. A fixed edit-distance budget is wrong for short
+    # brands: with distance <= 2 the three-letter "UBL" matched a large slice
+    # of the alphabet, while "nbp.com.pk" is four edits from "hbl.com.pk" so it
+    # matched nothing at all. The detector scales its tolerance to the brand's
+    # length and checks five impersonation techniques rather than substitution
+    # alone, against a 74-institution registry instead of nine hardcoded names.
+    assessment = get_detector().assess(domain)
+    if assessment.suspicious:
+        url_risk += int(round(assessment.risk * 40))
+        brand = assessment.impersonated_brand or "aik verified institution"
+        reason = assessment.evidence[0] if assessment.evidence else "domain verified brand se milta julta hai"
+        findings.append({
+            "type": "brand_impersonation",
+            "detail": f"{brand} ki naqal: {reason}",
+            "severity": "critical",
+            "techniques": assessment.techniques,
+            "risk": assessment.risk,
+        })
     
     # 5. Crawl if not already obvious scam and the domain actually resolves
     screenshot_base64 = None
@@ -160,18 +241,8 @@ async def analyze_website(url):
         "content_risk": content_risk
     }
 
-def levenshtein(s1, s2):
-    if len(s1) < len(s2):
-        return levenshtein(s2, s1)
-    if len(s2) == 0:
-        return len(s1)
-    previous_row = range(len(s2) + 1)
-    for i, c1 in enumerate(s1):
-        current_row = [i + 1]
-        for j, c2 in enumerate(s2):
-            insertions = previous_row[j + 1] + 1
-            deletions = current_row[j] + 1
-            substitutions = previous_row[j] + (c1 != c2)
-            current_row.append(min(insertions, deletions, substitutions))
-        previous_row = current_row
-    return previous_row[-1]
+# NOTE: the local ``levenshtein`` helper that used to live here is gone. It was
+# dead once brand matching moved to haafiz.intel.domain_similarity, which uses
+# Damerau-Levenshtein (transpositions count as one edit, not two) and scales its
+# tolerance to the brand's length. Keeping a second, weaker copy around invited
+# someone to use the wrong one.

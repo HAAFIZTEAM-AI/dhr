@@ -36,7 +36,7 @@ from typing import Callable, Iterable
 __all__ = ["SUPPORTED_REPLY_LANGS", "detect_language", "resolve_language"]
 
 #: Languages HAAFIZ can answer in. Must stay in sync with
-#: ``app.verdict.render.SUPPORTED_LANGS``.
+#: ``haafiz.verdict.render.SUPPORTED_LANGS``.
 SUPPORTED_REPLY_LANGS: tuple[str, ...] = ("roman", "urdu", "en", "sd", "pa", "ps", "bal")
 
 #: Accepted spellings users may type after the LANG command.

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.analyzers.digital_arrest import detect_digital_arrest
+from haafiz.analyzers.digital_arrest import detect_digital_arrest
 
 
 class TestPositiveDetection:

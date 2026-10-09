@@ -31,7 +31,15 @@ WORKDIR /srv/haafiz
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
+# Copy every piece of runtime code. An earlier version had a single
+# `COPY app ./app`, which was silently broken twice over: `app/` was a package
+# directory that shadowed the `app.py` FastAPI entrypoint, so the container had
+# the package but no server, and neither `app.py` nor `analyzers/` were ever
+# copied. Every COPY below is load-bearing.
+COPY app.py ./
+COPY analyzers ./analyzers
+COPY haafiz ./haafiz
+COPY train_model.py ./
 COPY data ./data
 
 # Run as a non-root user. This service executes OCR and transcribes untrusted
@@ -53,4 +61,7 @@ EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsS http://localhost:5001/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5001"]
+# `app:app` -- the FastAPI instance lives in app.py at the service root, not in
+# an `app/` package. Do not create a directory called `app` in this service;
+# it shadows app.py and the server becomes unimportable.
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5001"]

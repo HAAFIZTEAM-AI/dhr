@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.verdict.render import SUPPORTED_LANGS, render_verdict
+from haafiz.verdict.render import SUPPORTED_LANGS, render_verdict
 
 
 class TestNeverShowBarePercentage:

@@ -12,7 +12,7 @@ from unittest import mock
 
 import pytest
 
-from app.core.ssrf import SSRFError, SsrfPolicy, assert_public_url
+from haafiz.core.ssrf import SSRFError, SsrfPolicy, assert_public_url
 
 
 class TestCloudMetadata:
@@ -58,7 +58,7 @@ class TestInternalNetworks:
     def test_hostname_resolving_to_internal_ip_blocked(self):
         """DNS pointing a public-looking name at a private address."""
         fake = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.0.10", 443))]
-        with mock.patch("app.core.ssrf.socket.getaddrinfo", return_value=fake):
+        with mock.patch("haafiz.core.ssrf.socket.getaddrinfo", return_value=fake):
             with pytest.raises(SSRFError, match="non-public"):
                 assert_public_url("https://innocent-looking.example/")
 
@@ -68,7 +68,7 @@ class TestInternalNetworks:
             (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2606:2800:220:1:248:1893:25c8:1946", 443, 0, 0)),
             (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)),
         ]
-        with mock.patch("app.core.ssrf.socket.getaddrinfo", return_value=fake):
+        with mock.patch("haafiz.core.ssrf.socket.getaddrinfo", return_value=fake):
             with pytest.raises(SSRFError):
                 assert_public_url("https://dual-stack.example/")
 
@@ -140,7 +140,7 @@ class TestLegitimateUseIsNotBroken:
 
     def test_public_hostname_resolves(self):
         fake = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
-        with mock.patch("app.core.ssrf.socket.getaddrinfo", return_value=fake):
+        with mock.patch("haafiz.core.ssrf.socket.getaddrinfo", return_value=fake):
             assert assert_public_url("https://example.com/") == ["93.184.216.34"]
 
     def test_public_ipv6_allowed_by_default(self):
@@ -149,13 +149,13 @@ class TestLegitimateUseIsNotBroken:
 
     def test_fqdn_trailing_dot_tolerated(self):
         fake = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
-        with mock.patch("app.core.ssrf.socket.getaddrinfo", return_value=fake):
+        with mock.patch("haafiz.core.ssrf.socket.getaddrinfo", return_value=fake):
             assert assert_public_url("https://example.com./") == ["93.184.216.34"]
 
     def test_non_resolving_domain_raises_ssrf_not_socket_error(self):
         """The analyzer reports 'domain does not resolve' as a scam signal, so
         this must surface as SSRFError with a clear message, not gaierror."""
-        with mock.patch("app.core.ssrf.socket.getaddrinfo", side_effect=socket.gaierror("nope")):
+        with mock.patch("haafiz.core.ssrf.socket.getaddrinfo", side_effect=socket.gaierror("nope")):
             with pytest.raises(SSRFError, match="does not resolve"):
                 assert_public_url("https://nonexistent-domain-xyz.example/")
 
